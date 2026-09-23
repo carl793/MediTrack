@@ -27,25 +27,25 @@ class PillButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final isActive = enabled && !isLoading && onTap != null;
     final bg = backgroundColor ??
-        (isActive ? MediTrackColors.mint : MediTrackColors.grayLight);
+        (isActive ? MediTrackColors.navy : MediTrackColors.grayLight);
     final fg = textColor ??
-        (isActive ? MediTrackColors.navy : MediTrackColors.grayMedium);
+        (isActive ? MediTrackColors.white : MediTrackColors.grayMedium);
 
     return GestureDetector(
       onTap: isActive ? onTap : null,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         width: width ?? double.infinity,
-        height: 56,
+        height: 52,
         decoration: BoxDecoration(
           color: bg,
-          borderRadius: const BorderRadius.all(AppRadius.pill),
+          borderRadius: BorderRadius.circular(AppRadius.button),
           boxShadow: isActive
               ? [
                   BoxShadow(
-                    color: MediTrackColors.mint.withValues(alpha: 0.35),
-                    blurRadius: 16,
-                    offset: const Offset(0, 6),
+                    color: MediTrackColors.navy.withValues(alpha: 0.25),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
                   )
                 ]
               : [],
@@ -53,8 +53,8 @@ class PillButton extends StatelessWidget {
         child: Center(
           child: isLoading
               ? SizedBox(
-                  width: 22,
-                  height: 22,
+                  width: 20,
+                  height: 20,
                   child: CircularProgressIndicator(
                     strokeWidth: 2.5,
                     valueColor: AlwaysStoppedAnimation(fg),
@@ -64,16 +64,15 @@ class PillButton extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     if (icon != null) ...[
-                      Icon(icon, size: 20, color: fg),
+                      Icon(icon, size: 18, color: fg),
                       const SizedBox(width: 8),
                     ],
                     Text(
                       label,
                       style: TextStyle(
-                        fontSize: 16,
+                        fontSize: 15,
                         fontWeight: FontWeight.w700,
                         color: fg,
-                        letterSpacing: -0.2,
                       ),
                     ),
                   ],
@@ -109,20 +108,19 @@ class OutlinePillButton extends StatelessWidget {
       onTap: onTap,
       child: Container(
         width: width ?? double.infinity,
-        height: 56,
+        height: 52,
         decoration: BoxDecoration(
           color: Colors.transparent,
-          borderRadius: const BorderRadius.all(AppRadius.pill),
+          borderRadius: BorderRadius.circular(AppRadius.button),
           border: Border.all(color: bc, width: 1.5),
         ),
         child: Center(
           child: Text(
             label,
             style: TextStyle(
-              fontSize: 16,
+              fontSize: 15,
               fontWeight: FontWeight.w600,
               color: tc,
-              letterSpacing: -0.2,
             ),
           ),
         ),

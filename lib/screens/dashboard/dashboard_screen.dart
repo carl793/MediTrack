@@ -26,9 +26,11 @@ class DashboardScreen extends StatelessWidget {
           body: SafeArea(
             child: Column(
               children: [
-                // Offline banner
-                if (!state.deviceConnection.isOnline &&
-                    state.medicationConfig != null)
+                // Offline banner — only show when ESP32 is KNOWN offline
+                // (not when it simply hasn't connected yet / pre-hardware)
+                if (state.medicationConfig != null &&
+                    state.deviceConnection.lastSeen != null &&
+                    !state.deviceConnection.isOnline)
                   const OfflineBanner(),
 
                 // Main content
@@ -64,6 +66,7 @@ class DashboardScreen extends StatelessWidget {
       case DashboardState.notConfigured:
         return NotConfiguredView(
           onAddMedication: () => _openWizard(context, state),
+          isConnected: state.deviceConnection.isOnline,
         );
 
       case DashboardState.lockedIdle:
@@ -146,36 +149,31 @@ class _BottomNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 72,
-      decoration: const BoxDecoration(
-        color: Colors.white,
+      height: 68,
+      decoration: BoxDecoration(
+        color: MediTrackColors.pageBg,
         border: Border(
           top: BorderSide(
-            color: MediTrackColors.grayLight,
-            width: 1,
+            color: MediTrackColors.grayLight.withValues(alpha: 0.8),
+            width: 0.5,
           ),
         ),
       ),
       child: Row(
         children: [
+          // Home — active
           _NavItem(
-            icon: Icons.home_rounded,
+            icon: Icons.medication_rounded,
             label: 'Home',
             isActive: true,
             onTap: () {},
           ),
+          // History — inactive
           _NavItem(
-            icon: Icons.history_rounded,
+            icon: Icons.calendar_today_rounded,
             label: 'History',
             isActive: false,
             onTap: onHistoryTap,
-          ),
-          // Profile icon — static, non-interactive per spec
-          _NavItem(
-            icon: Icons.person_rounded,
-            label: 'Profile',
-            isActive: false,
-            onTap: () {}, // Non-interactive per spec §12
           ),
         ],
       ),
@@ -207,28 +205,23 @@ class _NavItem extends StatelessWidget {
           children: [
             Icon(
               icon,
-              size: 24,
-              color: isActive ? MediTrackColors.navy : MediTrackColors.grayMedium,
+              size: 22,
+              color: isActive
+                  ? MediTrackColors.navy
+                  : MediTrackColors.textSecondary,
             ),
-            const SizedBox(height: 3),
+            const SizedBox(height: 4),
             Text(
               label,
               style: TextStyle(
-                fontSize: 10,
-                fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-                color: isActive ? MediTrackColors.navy : MediTrackColors.grayMedium,
+                fontSize: 12,
+                fontWeight:
+                    isActive ? FontWeight.w700 : FontWeight.w400,
+                color: isActive
+                    ? MediTrackColors.navy
+                    : MediTrackColors.textSecondary,
               ),
             ),
-            const SizedBox(height: 4),
-            if (isActive)
-              Container(
-                width: 4,
-                height: 4,
-                decoration: const BoxDecoration(
-                  color: MediTrackColors.mint,
-                  shape: BoxShape.circle,
-                ),
-              ),
           ],
         ),
       ),

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../../state/meditrack_state.dart';
 import '../../../theme/app_theme.dart';
+import '../../../widgets/countdown_chip.dart';
+import '../../../widgets/day_strip.dart';
 import '../../../widgets/info_card.dart';
 import '../../../widgets/pill_button.dart';
 import '../../../widgets/two_tone_capsule.dart';
@@ -22,28 +24,119 @@ class UnlockedIdleView extends StatelessWidget {
   Widget build(BuildContext context) {
     final config = state.medicationConfig!;
     final slot = state.currentSlot;
-    final isOnline = state.deviceConnection.isOnline;
+
+    // Dispense button is always enabled in app-only mode (no ESP32 connected yet)
+    // Once ESP32 connects, dispense is blocked only when it goes offline
+    final espHasEverConnected = state.deviceConnection.lastSeen != null;
+    final isKnownOffline = espHasEverConnected && !state.deviceConnection.isOnline;
+    // Allow dispense if: (1) ESP32 never connected (app-only mode), OR (2) ESP32 is online
+    final canDispense = !espHasEverConnected || !isKnownOffline;
     final hasStock = state.stockLevel > 0;
-    final canDispense = isOnline && hasStock;
     final daysLeft = state.daysOfSupplyRemaining;
 
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          DashboardHeader(onEditTap: onEditTap),
+          DashboardHeader(isConnected: state.deviceConnection.isOnline, onEditTap: onEditTap),
+
+          // Greeting section
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Eyebrow
+                      const Text(
+                        "TODAY'S REGIMEN",
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.88,
+                          color: MediTrackColors.navy,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      // Headline
+                      Text(
+                        _greeting(),
+                        style: const TextStyle(
+                          fontSize: 26,
+                          fontWeight: FontWeight.w700,
+                          color: MediTrackColors.textPrimary,
+                          height: 1.1,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Your medication is ready to dispense',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: MediTrackColors.textSecondary,
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // Sun badge
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: MediTrackColors.lavenderLight,
+                  ),
+                  child: const Icon(
+                    Icons.wb_sunny_rounded,
+                    size: 20,
+                    color: MediTrackColors.amber,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: AppSpacing.md),
+
+          // Day strip
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
+            child: DayStrip(),
+          ),
+
+          const SizedBox(height: AppSpacing.md),
 
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Status chip
-                const StatusChip(
-                  label: 'READY TO DISPENSE',
-                  backgroundColor: MediTrackColors.mint,
-                  textColor: MediTrackColors.navy,
-                  icon: Icons.check_circle_rounded,
+                // Status chip row with window-close countdown
+                Row(
+                  children: [
+                    const StatusChip(
+                      label: 'READY TO DISPENSE',
+                      backgroundColor: MediTrackColors.mint,
+                      textColor: MediTrackColors.navy,
+                      icon: Icons.check_circle_rounded,
+                    ),
+                    const Spacer(),
+                    // Countdown to when this dose window closes (marks missed)
+                    if (slot != null)
+                      CountdownChip(
+                        targetTime: slot.windowCloseTime,
+                        backgroundColor:
+                            MediTrackColors.coral.withValues(alpha: 0.12),
+                        textColor: MediTrackColors.coral,
+                        prefix: 'Closes: ',
+                      ),
+                  ],
                 ),
 
                 const SizedBox(height: AppSpacing.lg),
@@ -123,8 +216,23 @@ class UnlockedIdleView extends StatelessWidget {
                                   color: MediTrackColors.navy,
                                 ),
                               ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Window closes at ${_formatTime(
+                                  '${slot.windowCloseTime.hour.toString().padLeft(2, '0')}:${slot.windowCloseTime.minute.toString().padLeft(2, '0')}',
+                                )}',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: MediTrackColors.gray,
+                                ),
+                              ),
                             ],
                           ),
+                        ),
+                        const StatusChip(
+                          label: 'DUE',
+                          backgroundColor: MediTrackColors.mint,
+                          textColor: MediTrackColors.navy,
                         ),
                       ],
                     ),
@@ -164,7 +272,7 @@ class UnlockedIdleView extends StatelessWidget {
 
                 const SizedBox(height: AppSpacing.lg),
 
-                // Stock warning
+                // Stock warning (advisory only — does not block dispense)
                 if (!hasStock)
                   Padding(
                     padding: const EdgeInsets.only(bottom: AppSpacing.md),
@@ -217,6 +325,13 @@ class UnlockedIdleView extends StatelessWidget {
     final period = h >= 12 ? 'PM' : 'AM';
     final h12 = h > 12 ? h - 12 : (h == 0 ? 12 : h);
     return '$h12:$m $period';
+  }
+
+  String _greeting() {
+    final h = DateTime.now().hour;
+    if (h < 12) return 'Good morning';
+    if (h < 17) return 'Good afternoon';
+    return 'Good evening';
   }
 }
 

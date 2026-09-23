@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../models/history_event.dart';
 import '../../../state/meditrack_state.dart';
 import '../../../theme/app_theme.dart';
 import '../../../widgets/info_card.dart';
@@ -21,10 +22,39 @@ class ResolvedMissedView extends StatelessWidget {
     final config = state.medicationConfig!;
     final tray = state.trayState;
 
-    // Find the missed event to determine reason
-    final missedEvent = state.history.isNotEmpty ? state.history.first : null;
+    // Find the most recent unacknowledged missed event
+    // Could be from trayState (hardware) or history (not_dispensed)
+    HistoryEvent? missedEvent;
+    
+    if (tray.resolution == 'missed' && tray.resolvedAtDateTime != null) {
+      // Hardware-detected miss - find it in history
+      missedEvent = state.history.whereType<HistoryEvent>().cast<HistoryEvent?>().firstWhere(
+        (e) => e?.resolvedAtDateTime == tray.resolvedAtDateTime,
+        orElse: () => null,
+      );
+    }
+    
+    // If not from tray, find most recent unacknowledged missed from history
+    if (missedEvent == null) {
+      final lastAck = state.lastAcknowledgedResolvedAt;
+      final unacknowledgedMisses = state.history.whereType<HistoryEvent>().where((e) {
+        if (!e.isMissed) return false;
+        final eventTime = e.resolvedAtDateTime;
+        if (eventTime == null) return false;
+        return lastAck == null || eventTime.isAfter(lastAck);
+      }).toList();
+      
+      if (unacknowledgedMisses.isNotEmpty) {
+        // Sort by resolved time, most recent first
+        unacknowledgedMisses.sort((a, b) => 
+          b.resolvedAtDateTime!.compareTo(a.resolvedAtDateTime!));
+        missedEvent = unacknowledgedMisses.first;
+      }
+    }
+
     final reason = missedEvent?.reason ?? 'not_dispensed';
     final isNotPickedUp = reason == 'not_picked_up';
+    final resolvedTime = missedEvent?.resolvedAtDateTime ?? tray.resolvedAtDateTime;
 
     final reasonCopy = isNotPickedUp
         ? '15-minute pickup window expired (pill remained in tray)'
@@ -34,7 +64,7 @@ class ResolvedMissedView extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const DashboardHeader(showEdit: false),
+          const DashboardHeader(),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
             child: Column(
@@ -125,10 +155,10 @@ class ResolvedMissedView extends StatelessWidget {
                         ),
                       ),
 
-                      if (tray.resolvedAtDateTime != null) ...[
+                      if (resolvedTime != null) ...[
                         const SizedBox(height: 8),
                         Text(
-                          'Recorded at ${_formatTime(tray.resolvedAtDateTime!)}',
+                          'Recorded at ${_formatTime(resolvedTime)}',
                           style: const TextStyle(
                             fontSize: 12,
                             color: MediTrackColors.gray,

@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import '../../../models/history_event.dart';
 import '../../../state/meditrack_state.dart';
 import '../../../theme/app_theme.dart';
 import '../../../widgets/info_card.dart';
 import '../../../widgets/pill_button.dart';
 import '../../../widgets/two_tone_capsule.dart';
 import '../../../widgets/countdown_chip.dart';
+import '../../../widgets/day_strip.dart';
 import '../widgets/dashboard_header.dart';
 
 class LockedIdleView extends StatelessWidget {
@@ -27,7 +29,79 @@ class LockedIdleView extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          DashboardHeader(onEditTap: onEditTap),
+          DashboardHeader(isConnected: state.deviceConnection.isOnline, onEditTap: onEditTap),
+
+          // Greeting section
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Eyebrow
+                      const Text(
+                        "TODAY'S REGIMEN",
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.88,
+                          color: MediTrackColors.navy,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      // Headline
+                      Text(
+                        _greeting(),
+                        style: const TextStyle(
+                          fontSize: 26,
+                          fontWeight: FontWeight.w700,
+                          color: MediTrackColors.textPrimary,
+                          height: 1.1,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Your next dose is scheduled and ready',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: MediTrackColors.textSecondary,
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // Sun badge
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: MediTrackColors.lavenderLight,
+                  ),
+                  child: const Icon(
+                    Icons.wb_sunny_rounded,
+                    size: 20,
+                    color: MediTrackColors.amber,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: AppSpacing.md),
+
+          // Day strip
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
+            child: DayStrip(),
+          ),
+
+          const SizedBox(height: AppSpacing.md),
 
           Padding(
             padding:
@@ -226,6 +300,13 @@ class LockedIdleView extends StatelessWidget {
     final h12 = h > 12 ? h - 12 : (h == 0 ? 12 : h);
     return '$h12:$m $period';
   }
+
+  String _greeting() {
+    final h = DateTime.now().hour;
+    if (h < 12) return 'Good morning';
+    if (h < 17) return 'Good afternoon';
+    return 'Good evening';
+  }
 }
 
 class _AllDosesToday extends StatelessWidget {
@@ -255,13 +336,22 @@ class _AllDosesToday extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.sm),
           ...alarmTimes.map((t) {
-            final resolved = history.any((e) =>
-                e.scheduledFor == t && e.date == todayStr);
+            // Find the history event for this time slot today
+            final historyEvent = history.whereType<HistoryEvent>().cast<HistoryEvent?>().firstWhere(
+              (e) => e?.scheduledFor == t && e?.date == todayStr,
+              orElse: () => null,
+            );
+            
+            // Determine status based on history event
+            final isTaken = historyEvent?.isTaken ?? false;
+            final isMissed = historyEvent?.isMissed ?? false;
+            
             final parts = t.split(':');
             final h = int.parse(parts[0]);
             final m = parts[1];
             final period = h >= 12 ? 'PM' : 'AM';
             final h12 = h > 12 ? h - 12 : (h == 0 ? 12 : h);
+            
             return Padding(
               padding: const EdgeInsets.only(top: 8),
               child: Row(
@@ -270,9 +360,11 @@ class _AllDosesToday extends StatelessWidget {
                     width: 8,
                     height: 8,
                     decoration: BoxDecoration(
-                      color: resolved
+                      color: isTaken
                           ? MediTrackColors.mint
-                          : MediTrackColors.grayLight,
+                          : isMissed
+                              ? MediTrackColors.coral
+                              : MediTrackColors.grayLight,
                       shape: BoxShape.circle,
                     ),
                   ),
@@ -282,20 +374,22 @@ class _AllDosesToday extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: resolved
+                      color: isTaken || isMissed
                           ? MediTrackColors.gray
                           : MediTrackColors.navy,
                     ),
                   ),
                   const Spacer(),
                   Text(
-                    resolved ? 'Taken' : 'Pending',
+                    isTaken ? 'Taken' : isMissed ? 'Missed' : 'Pending',
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: resolved
+                      color: isTaken
                           ? MediTrackColors.mintDark
-                          : MediTrackColors.gray,
+                          : isMissed
+                              ? MediTrackColors.coral
+                              : MediTrackColors.gray,
                     ),
                   ),
                 ],

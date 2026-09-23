@@ -104,11 +104,10 @@ class SchedulingService {
 
   DateTime _computeWindowClose(
       int index, List<String> sortedTimes, DateTime baseDate) {
-    if (index < sortedTimes.length - 1) {
-      return _buildDateTime(baseDate, sortedTimes[index + 1]);
-    }
-    // Last slot: closes at midnight
-    return DateTime(baseDate.year, baseDate.month, baseDate.day, 23, 59, 59);
+    // Window closes after missedWindowMinutes for ALL doses
+    // This matches the user's configuration (e.g., 15 minutes window)
+    final slotTime = _buildDateTime(baseDate, sortedTimes[index]);
+    return slotTime.add(Duration(minutes: config.missedWindowMinutes));
   }
 
   DateTime _buildDateTime(DateTime date, String hhmm) {

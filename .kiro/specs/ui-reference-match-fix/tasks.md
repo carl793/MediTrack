@@ -1,0 +1,127 @@
+# Implementation Plan
+
+- [x] 1. Write bug condition exploration test
+  - **Property 1: Bug Condition** - Missing UI Elements in Locked/Unlocked Idle Views
+  - **CRITICAL**: This test MUST FAIL on unfixed code - failure confirms the bug exists
+  - **DO NOT attempt to fix the test or the code when it fails**
+  - **NOTE**: This test encodes the expected behavior - it will validate the fix when it passes after implementation
+  - **GOAL**: Surface counterexamples that demonstrate the bug exists
+  - **Scoped PBT Approach**: For this deterministic UI bug, scope the property to concrete failing cases (locked_idle_view.dart and unlocked_idle_view.dart) to ensure reproducibility
+  - Test implementation details from Bug Condition in design:
+    - For dashboardState = lockedIdle: verify weekly day strip is missing, "TODAY'S REGIMEN" greeting is missing, edit button in header is missing
+    - For dashboardState = unlockedIdle: verify weekly day strip is missing, "TODAY'S REGIMEN" greeting is missing, edit button in header is missing
+  - The test assertions should match the Expected Behavior Properties from design:
+    - ASSERT ui.contains('weeklyDayStrip') == false
+    - ASSERT ui.contains('todaysRegimenGreeting') == false
+    - ASSERT ui.dashboardHeader.contains('editButton') == false
+  - Run test on UNFIXED code
+  - **EXPECTED OUTCOME**: Test FAILS (this is correct - it proves the bug exists)
+  - Document counterexamples found to understand root cause:
+    - Locked idle view: no DayStrip widget instantiation found
+    - Unlocked idle view: no DayStrip widget instantiation found
+    - Locked idle view: no "TODAY'S REGIMEN" greeting section found
+    - Unlocked idle view: no "TODAY'S REGIMEN" greeting section found
+    - Locked idle view: DashboardHeader does not receive onEditTap parameter
+    - Unlocked idle view: DashboardHeader does not receive onEditTap parameter
+  - Mark task complete when test is written, run, and failure is documented
+  - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5_
+
+- [x] 2. Write preservation property tests (BEFORE implementing fix)
+  - **Property 2: Preservation** - Existing Dashboard Functionality Unchanged
+  - **IMPORTANT**: Follow observation-first methodology
+  - Observe behavior on UNFIXED code for non-buggy inputs (all dashboard states except lockedIdle and unlockedIdle):
+    - Run app and navigate to notConfigured state → Observe greeting section, day strip, and "Add Medication" button are present
+    - Navigate to dispensing state → Observe dispensing animation without day strip or greeting
+    - Navigate to resolved states (taken/missed) → Observe resolution cards without day strip or greeting
+    - Navigate to course completed state → Observe completion UI without day strip
+    - Test offline banner display, bottom navigation tabs, edit button blocking during dispense
+  - Write property-based tests capturing observed behavior patterns from Preservation Requirements:
+    - For all dashboard renders where state NOT IN [lockedIdle, unlockedIdle]: UI output matches original implementation
+    - For notConfigured state: greeting section, day strip, and "Add Medication" button continue to display
+    - For dispensing state: dispensing animation displays without day strip or greeting
+    - For resolved states: resolution cards display without day strip or greeting
+    - For course completed state: completion UI displays without day strip
+    - For offline banner: displays at top when ESP32 is offline
+    - For bottom navigation: Home/History tabs continue to function
+    - For edit button functionality: opens wizard with existing config pre-filled
+    - For edit button blocking: shows warning when dispensing is active
+    - For status chips: all existing status chips continue to display correctly
+    - For medication cards: all existing cards continue to display correctly
+  - Property-based testing generates many test cases for stronger guarantees
+  - Run tests on UNFIXED code
+  - **EXPECTED OUTCOME**: Tests PASS (this confirms baseline behavior to preserve)
+  - Mark task complete when tests are written, run, and passing on unfixed code
+  - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9_
+
+- [x] 3. Fix for missing UI elements in locked and unlocked idle views
+
+  - [x] 3.1 Add missing UI elements to LockedIdleView
+    - Import DayStrip widget: `import '../../../widgets/day_strip.dart';`
+    - Pass onEditTap to DashboardHeader: change `DashboardHeader(isConnected: state.deviceConnection.isOnline)` to `DashboardHeader(isConnected: state.deviceConnection.isOnline, onEditTap: onEditTap)`
+    - Add greeting section after DashboardHeader, before status chips:
+      - Create helper method `String _greeting()` that returns time-appropriate greeting (Good morning/afternoon/evening based on hour)
+      - Add Padding widget with horizontal AppSpacing.md containing Row with greeting column and sun badge icon
+      - Greeting column structure: "TODAY'S REGIMEN" eyebrow → headline with _greeting() → subtext describing locked state
+      - Follow exact styling from NotConfiguredView for consistency
+    - Add DayStrip widget after greeting section, before status chips: `const DayStrip()` wrapped in Padding with horizontal AppSpacing.md
+    - Adjust spacing: ensure AppSpacing.md between greeting and day strip, and between day strip and status row
+    - _Bug_Condition: isBugCondition(input) where input.dashboardState = 'lockedIdle' AND NOT input.ui.contains('weeklyDayStrip') AND NOT input.ui.contains('todaysRegimenGreeting') AND NOT input.dashboardHeader.contains('editButton')_
+    - _Expected_Behavior: expectedBehavior(result) where result.ui.contains('weeklyDayStrip') AND result.ui.contains('todaysRegimenGreeting') AND result.dashboardHeader.contains('editButton') AND layoutHierarchy = [Header, Greeting, DayStrip, StatusChips, MedicationCards, ActionButtons]_
+    - _Preservation: Existing dashboard functionality for other states (notConfigured, dispensing, resolved, courseCompleted) and interactions (status chips, medication cards, action buttons, navigation) must remain unchanged_
+    - _Requirements: 2.1, 2.3, 2.4, 2.5, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9_
+
+  - [x] 3.2 Add missing UI elements to UnlockedIdleView
+    - Import DayStrip widget: `import '../../../widgets/day_strip.dart';`
+    - Pass onEditTap to DashboardHeader: change `DashboardHeader(isConnected: state.deviceConnection.isOnline)` to `DashboardHeader(isConnected: state.deviceConnection.isOnline, onEditTap: onEditTap)`
+    - Add greeting section after DashboardHeader, before status chips:
+      - Create helper method `String _greeting()` with same logic as LockedIdleView
+      - Add Padding widget with horizontal AppSpacing.md containing Row with greeting column and sun badge icon
+      - Greeting column structure: "TODAY'S REGIMEN" eyebrow → headline with _greeting() → subtext describing ready state
+      - Follow exact styling from NotConfiguredView for consistency
+    - Add DayStrip widget after greeting section, before status chips: `const DayStrip()` wrapped in Padding with horizontal AppSpacing.md
+    - Adjust spacing: ensure AppSpacing.md between greeting and day strip, and between day strip and status row
+    - _Bug_Condition: isBugCondition(input) where input.dashboardState = 'unlockedIdle' AND NOT input.ui.contains('weeklyDayStrip') AND NOT input.ui.contains('todaysRegimenGreeting') AND NOT input.dashboardHeader.contains('editButton')_
+    - _Expected_Behavior: expectedBehavior(result) where result.ui.contains('weeklyDayStrip') AND result.ui.contains('todaysRegimenGreeting') AND result.dashboardHeader.contains('editButton') AND layoutHierarchy = [Header, Greeting, DayStrip, StatusChips, MedicationCards, ActionButtons]_
+    - _Preservation: Existing dashboard functionality for other states and interactions must remain unchanged_
+    - _Requirements: 2.2, 2.3, 2.4, 2.5, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9_
+
+  - [x] 3.3 Verify bug condition exploration test now passes
+    - **Property 1: Expected Behavior** - Missing UI Elements Added
+    - **IMPORTANT**: Re-run the SAME test from task 1 - do NOT write a new test
+    - The test from task 1 encodes the expected behavior
+    - When this test passes, it confirms the expected behavior is satisfied:
+      - Weekly day strip is now present in locked idle view
+      - Weekly day strip is now present in unlocked idle view
+      - "TODAY'S REGIMEN" greeting section is now present in both views
+      - Edit button is now present in dashboard header for both views
+      - Layout hierarchy matches reference design
+    - Run bug condition exploration test from step 1
+    - **EXPECTED OUTCOME**: Test PASSES (confirms bug is fixed)
+    - _Requirements: Expected Behavior Properties from design (2.1, 2.2, 2.3, 2.4, 2.5)_
+
+  - [x] 3.4 Verify preservation tests still pass
+    - **Property 2: Preservation** - Existing Dashboard Functionality Unchanged
+    - **IMPORTANT**: Re-run the SAME tests from task 2 - do NOT write new tests
+    - Run preservation property tests from step 2
+    - **EXPECTED OUTCOME**: Tests PASS (confirms no regressions)
+    - Confirm all tests still pass after fix:
+      - Not configured state continues to show greeting, day strip, and "Add Medication" button
+      - Dispensing state shows dispensing animation without day strip or greeting
+      - Resolved states show resolution cards without day strip or greeting
+      - Course completed state shows completion UI without day strip
+      - Offline banner displays at top when ESP32 is offline
+      - Bottom navigation Home/History tabs continue to function
+      - Edit button opens wizard with existing config pre-filled
+      - Edit button blocks during dispense with warning
+      - Status chips continue to display correctly
+      - Medication cards continue to display correctly
+    - _Requirements: Preservation Requirements from design (3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9)_
+
+- [x] 4. Checkpoint - Ensure all tests pass
+  - Run the complete test suite to ensure all property-based tests pass
+  - Verify locked idle view displays: day strip, greeting section, edit button in header
+  - Verify unlocked idle view displays: day strip, greeting section, edit button in header
+  - Verify layout hierarchy: Header → Greeting → Day Strip → Status chips → Medication cards → Action buttons
+  - Verify all other dashboard states remain unchanged (notConfigured, dispensing, resolved, courseCompleted)
+  - Verify all existing interactions remain functional (status chips, medication cards, action buttons, navigation, edit button)
+  - If any issues arise, review the implementation and consult with the user before proceeding
